@@ -506,6 +506,17 @@
 
       <div style="margin-top: 12px;">
         <div class="label-row">
+          <label>订阅拉取代理 / Fetch Proxy</label>
+          <span class="hint">可选 · 用于解决 CORS</span>
+        </div>
+        <input type="url" id="corsProxy" placeholder="https://your-worker.workers.dev/?url={url}">
+        <div class="hint" style="margin-top: 6px; line-height: 1.6;">
+          静态页面直连失败时使用；订阅链接会发送到该代理，请只填写你信任的服务。
+        </div>
+      </div>
+
+      <div style="margin-top: 12px;">
+        <div class="label-row">
           <label>或粘贴 YAML 内容</label>
           <span class="hint">直接粘贴订阅返回的 YAML</span>
         </div>
@@ -1068,25 +1079,65 @@ document.getElementById('addProxyBtn').addEventListener('click', () => {
 /* ============================================================
  * SUBSCRIPTION FETCHING
  * ============================================================ */
+function parseSubscriptionLine(line) {
+  const trimmed = line.trim();
+  const hashIndex = trimmed.lastIndexOf('#');
+  if (hashIndex > 0 && hashIndex < trimmed.length - 1) {
+    return {
+      url: trimmed.slice(0, hashIndex).trim(),
+      tag: trimmed.slice(hashIndex + 1).trim(),
+    };
+  }
+  return { url: trimmed, tag: '' };
+}
+
+function buildProxyUrl(proxyTemplate, targetUrl) {
+  const proxy = proxyTemplate.trim();
+  const encoded = encodeURIComponent(targetUrl);
+  if (proxy.includes('{url}')) return proxy.replaceAll('{url}', encoded);
+  if (proxy.includes('{rawUrl}')) return proxy.replaceAll('{rawUrl}', targetUrl);
+  if (/[?&](url|target|u)=$/.test(proxy)) return proxy + encoded;
+  return proxy + (proxy.includes('?') ? '&' : '?') + 'url=' + encoded;
+}
+
+async function fetchText(url, sourceLabel) {
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`${sourceLabel} HTTP ${res.status}`);
+  return res.text();
+}
+
+async function fetchSubscriptionText(url, proxyTemplate) {
+  try {
+    return { text: await fetchText(url, 'direct'), via: 'direct' };
+  } catch (directErr) {
+    if (!proxyTemplate) throw directErr;
+    const proxyUrl = buildProxyUrl(proxyTemplate, url);
+    return { text: await fetchText(proxyUrl, 'proxy'), via: 'proxy' };
+  }
+}
+
 async function fetchSubs() {
   const lines = document.getElementById('subUrls').value.trim().split('\n').filter(Boolean);
+  const proxyTemplate = document.getElementById('corsProxy').value.trim();
   if (!lines.length) {
     toast('请先输入至少一个订阅链接', true);
     return;
   }
   setStatus('正在拉取订阅...', 'loading');
   const all = [];
-  let okCount = 0, failCount = 0;
+  let okCount = 0, failCount = 0, directCount = 0, proxyCount = 0;
   for (const line of lines) {
-    const [url, tag] = line.split('#');
+    const { url, tag } = parseSubscriptionLine(line);
+    if (!url) continue;
     try {
-      // Try direct fetch first; if blocked by CORS, suggest paste fallback
-      const res = await fetch(url.trim(), { headers: { 'User-Agent': 'clash-meta' } });
-      const text = await res.text();
+      const { text, via } = await fetchSubscriptionText(url, proxyTemplate);
       const proxies = parseProxiesFromYaml(text);
+      if (!proxies.length) throw new Error('未解析到节点');
       if (tag) proxies.forEach(p => p.name = `[${tag}] ${p.name}`);
       all.push(...proxies);
       okCount++;
+      if (via === 'proxy') proxyCount++;
+      else directCount++;
     } catch (err) {
       failCount++;
       console.warn('Fetch failed:', url, err);
@@ -1095,11 +1146,15 @@ async function fetchSubs() {
   state.fetchedProxies = all;
   updateProxyCount();
   if (okCount) {
-    setStatus(`已加载 ${all.length} 个节点`, 'ready');
-    toast(`成功 ${okCount} · 失败 ${failCount}${failCount ? '（CORS 限制时请改用粘贴 YAML）' : ''}`);
+    const viaText = proxyTemplate ? ` · 直连 ${directCount} · 代理 ${proxyCount}` : '';
+    setStatus(`已加载 ${all.length} 个节点${viaText}`, 'ready');
+    toast(`成功 ${okCount}${viaText} · 失败 ${failCount}`);
   } else {
-    setStatus('全部拉取失败 — 浏览器 CORS 限制，请改用粘贴 YAML', 'error');
-    toast('拉取失败：浏览器 CORS 限制。请将订阅返回的 YAML 直接粘贴到下方文本框', true);
+    const hint = proxyTemplate
+      ? '请检查订阅链接、代理服务或改用粘贴 YAML'
+      : '浏览器 CORS 限制，请配置订阅拉取代理或粘贴 YAML';
+    setStatus(`全部拉取失败 — ${hint}`, 'error');
+    toast(`拉取失败：${hint}`, true);
   }
   generate();
 }

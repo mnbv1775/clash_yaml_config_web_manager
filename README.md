@@ -50,6 +50,66 @@ https://mnbv1775.github.io/clash_yaml_config_web_manager/
 
 直接用浏览器打开 `index.html` 即可使用。
 
+## 订阅拉取与 CORS
+
+这个项目是纯静态页面，浏览器直接请求第三方订阅链接时，可能会被订阅服务的 CORS 策略拦截。遇到“全部拉取失败”时有两种方式：
+
+- 将订阅返回的 YAML 内容复制到“或粘贴 YAML 内容”输入框再解析。
+- 部署自己的订阅拉取代理，并在页面的“订阅拉取代理 / Fetch Proxy”里填写代理地址。
+
+代理地址支持以下格式：
+
+```text
+https://your-worker.workers.dev/?url={url}
+https://your-worker.workers.dev/
+```
+
+如果地址里没有 `{url}`，页面会自动追加 `?url=<订阅链接>`。
+
+Cloudflare Worker 示例：
+
+```js
+export default {
+  async fetch(request) {
+    const reqUrl = new URL(request.url);
+    const target = reqUrl.searchParams.get('url');
+
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { headers: corsHeaders() });
+    }
+
+    if (!target || !/^https?:\/\//i.test(target)) {
+      return new Response('Missing or invalid url', {
+        status: 400,
+        headers: corsHeaders(),
+      });
+    }
+
+    const upstream = await fetch(target, {
+      headers: { 'User-Agent': 'clash-meta' },
+    });
+
+    return new Response(await upstream.text(), {
+      status: upstream.status,
+      headers: {
+        ...corsHeaders(),
+        'content-type': 'text/plain; charset=utf-8',
+      },
+    });
+  },
+};
+
+function corsHeaders() {
+  return {
+    'access-control-allow-origin': '*',
+    'access-control-allow-methods': 'GET, OPTIONS',
+    'access-control-allow-headers': 'content-type',
+  };
+}
+```
+
+订阅链接通常包含敏感 token，请只使用自己部署或完全信任的代理。
+
 ## 注意事项
 
 - 本项目是静态页面，不需要后端服务。
