@@ -22,6 +22,7 @@ https://mnbv1775.github.io/clash_yaml_config_web_manager/
   - Full Media
 - 支持 AI、Google / YouTube / Telegram、国内直连、广告拦截、流媒体、负载均衡等规则模块
 - 支持自定义规则和手动添加自建节点
+- 手动节点支持 Clash YAML，也支持 `http` / `https` / `socks5` 简写代理格式
 - 支持复制或下载生成后的 YAML 配置
 
 ## GitHub Pages 配置
@@ -49,6 +50,24 @@ https://mnbv1775.github.io/clash_yaml_config_web_manager/
 ## 本地使用
 
 直接用浏览器打开 `index.html` 即可使用。
+
+## 手动添加 HTTP / SOCKS5 代理
+
+在 `Extra Proxies` 中点击“添加节点”，可以继续填写 Clash YAML，也可以使用简写格式，每行一个代理：
+
+```text
+http://user:pass@1.2.3.4:8080#HTTP-1
+https://1.2.3.4:8443:user:pass#HTTPS-1
+socks5://1.2.3.4:1080:user:pass#SOCKS-1
+http,1.2.3.4,8080,user,pass
+socks5 1.2.3.4 1080 user pass
+```
+
+说明：
+
+- `#` 后面的内容会作为节点名称。
+- `https` 会生成 Clash / Mihomo 的 `type: http` 并自动加上 `tls: true`。
+- 如果没有填写账号密码，会生成无认证的 HTTP / SOCKS5 代理节点。
 
 ## 订阅拉取与 CORS
 

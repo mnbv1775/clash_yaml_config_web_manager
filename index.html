@@ -643,7 +643,7 @@ const state = {
   },
   fetchedProxies: [],   // proxies parsed from subscriptions
   pastedProxies: [],    // proxies from pasted YAML
-  extraProxies: [],     // user-added proxies (raw YAML strings)
+  extraProxies: [],     // user-added proxies (raw YAML or simple proxy lines)
   customRules: [],      // {type, value, action}
   enabledModules: new Set(['CN_DIRECT', 'AI', 'GOOGLE']),
   activeRuleTemplate: 'BALANCED',
@@ -1051,7 +1051,7 @@ function renderExtraProxies() {
         <div class="proxy-block-name">PROXY #${i + 1}</div>
         <button class="btn sm danger" data-rm-p="${i}">移除</button>
       </div>
-      <textarea data-pi="${i}" placeholder="name: My-Server&#10;type: ss&#10;server: 1.2.3.4&#10;port: 443&#10;cipher: aes-256-gcm&#10;password: xxx">${p}</textarea>
+      <textarea data-pi="${i}" placeholder="支持 Clash YAML 或简写格式，每行一个：&#10;http://user:pass@1.2.3.4:8080#HTTP-1&#10;https://1.2.3.4:8443:user:pass#HTTPS-1&#10;socks5://1.2.3.4:1080:user:pass#SOCKS-1&#10;&#10;也可继续填写：&#10;name: My-Server&#10;type: ss&#10;server: 1.2.3.4&#10;port: 443&#10;cipher: aes-256-gcm&#10;password: xxx">${p}</textarea>
     `;
     wrap.appendChild(block);
   });
@@ -1190,6 +1190,114 @@ function parseProxiesFromYaml(text) {
   return [];
 }
 
+function normalizeSimpleProxyScheme(scheme) {
+  const s = scheme.toLowerCase();
+  if (s === 'https') return { type: 'http', tls: true, label: 'HTTPS' };
+  if (s === 'socks' || s === 'socks5') return { type: 'socks5', tls: false, label: 'SOCKS5' };
+  return { type: 'http', tls: false, label: 'HTTP' };
+}
+
+function splitProxyName(line) {
+  const hashIndex = line.lastIndexOf('#');
+  if (hashIndex > 0 && hashIndex < line.length - 1) {
+    return {
+      body: line.slice(0, hashIndex).trim(),
+      name: line.slice(hashIndex + 1).trim(),
+    };
+  }
+  return { body: line.trim(), name: '' };
+}
+
+function makeSimpleProxy({ scheme, host, port, username, password, name }) {
+  const normalized = normalizeSimpleProxyScheme(scheme);
+  const portNum = Number(port);
+  if (!host || !Number.isInteger(portNum) || portNum < 1 || portNum > 65535) {
+    throw new Error('代理地址或端口无效');
+  }
+
+  const proxy = {
+    name: name || `${normalized.label} ${host}:${portNum}`,
+    type: normalized.type,
+    server: host,
+    port: portNum,
+  };
+  if (normalized.tls) proxy.tls = true;
+  if (username) proxy.username = username;
+  if (password) proxy.password = password;
+  return proxy;
+}
+
+function parseDelimitedProxy(body, name) {
+  const match = body.match(/^(https?|socks5?|socks)[,\s|]+(.+)$/i);
+  if (!match) return null;
+  const parts = match[2].split(/[,\s|]+/).filter(Boolean);
+  if (parts.length < 2) return null;
+  return makeSimpleProxy({
+    scheme: match[1],
+    host: parts[0],
+    port: parts[1],
+    username: parts[2] || '',
+    password: parts.slice(3).join(' '),
+    name,
+  });
+}
+
+function parseColonProxy(body, name) {
+  const match = body.match(/^(https?|socks5?|socks):\/\/(.+)$/i)
+    || body.match(/^(https?|socks5?|socks):(.+)$/i);
+  if (!match) return null;
+
+  const scheme = match[1];
+  const endpoint = match[2].split(/[/?]/)[0];
+  if (endpoint.includes('@')) {
+    const parsed = new URL(`${scheme}://${endpoint}`);
+    return makeSimpleProxy({
+      scheme,
+      host: parsed.hostname,
+      port: parsed.port,
+      username: decodeURIComponent(parsed.username || ''),
+      password: decodeURIComponent(parsed.password || ''),
+      name,
+    });
+  }
+
+  const parts = endpoint.split(':');
+  if (parts.length < 2) return null;
+  return makeSimpleProxy({
+    scheme,
+    host: parts[0],
+    port: parts[1],
+    username: parts[2] || '',
+    password: parts.slice(3).join(':'),
+    name,
+  });
+}
+
+function parseSimpleProxyLine(line) {
+  const { body, name } = splitProxyName(line);
+  if (!body || body.startsWith('#')) return null;
+  return parseColonProxy(body, name) || parseDelimitedProxy(body, name);
+}
+
+function parseSimpleProxyLines(raw) {
+  const proxies = [];
+  raw.split('\n').forEach(line => {
+    const proxy = parseSimpleProxyLine(line.trim());
+    if (proxy) proxies.push(proxy);
+  });
+  return proxies;
+}
+
+function parseExtraProxyBlock(raw) {
+  const simpleProxies = parseSimpleProxyLines(raw);
+  if (simpleProxies.length) return simpleProxies;
+
+  const t = raw.trim().startsWith('-') ? raw.trim() : '- ' + raw.trim().split('\n').join('\n  ');
+  const parsed = jsyaml.load(t);
+  if (Array.isArray(parsed)) return parsed.filter(Boolean);
+  return parsed ? [parsed] : [];
+}
+
 function updateProxyCount() {
   const total = state.fetchedProxies.length + state.pastedProxies.length;
   document.getElementById('proxyCount').textContent = `${total} 个节点已加载`;
@@ -1322,10 +1430,7 @@ function gatherInputs() {
   state.extraProxies.forEach(raw => {
     if (!raw.trim()) return;
     try {
-      const t = raw.trim().startsWith('-') ? raw : '- ' + raw.split('\n').join('\n  ');
-      const parsed = jsyaml.load(t);
-      if (Array.isArray(parsed)) allProxies.push(...parsed);
-      else if (parsed) allProxies.push(parsed);
+      allProxies.push(...parseExtraProxyBlock(raw));
     } catch (e) { /* skip bad */ }
   });
 
