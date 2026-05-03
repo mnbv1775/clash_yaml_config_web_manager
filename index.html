@@ -1,0 +1,1612 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clash Config Forge — YAML 配置生成器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800&family=Fraunces:opsz,wght,SOFT,WONK@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700;9..144,800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+<style>
+  :root {
+    --bg: #14161a;
+    --bg-2: #1c1f24;
+    --bg-3: #252930;
+    --line: #2e333b;
+    --line-2: #3d434d;
+    --text: #f4f5f7;
+    --text-2: #b8bcc4;
+    --text-3: #7a808a;
+    --accent: #e6b450;
+    --accent-soft: rgba(230, 180, 80, 0.12);
+    --accent-2: #ff8b5e;
+    --warn: #f5a623;
+    --ok: #5dd9a3;
+    --bad: #f55c7a;
+    --info: #6ba3e8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html { font-size: 16px; }
+  html, body {
+    background: var(--bg); color: var(--text);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    -webkit-font-smoothing: antialiased;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    min-height: 100vh;
+    background-image:
+      radial-gradient(ellipse 90% 50% at 50% -10%, rgba(230, 180, 80, 0.06), transparent 60%);
+  }
+
+  /* HEADER */
+  header {
+    border-bottom: 1px solid var(--line);
+    padding: 24px 32px 20px;
+    display: flex; justify-content: space-between; align-items: flex-end; gap: 20px;
+  }
+  .brand { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+  .brand-tag { font-size: 11px; letter-spacing: 0.25em; color: var(--text-3); text-transform: uppercase; font-weight: 500; }
+  .brand-name {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 38px;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    font-variation-settings: "SOFT" 50;
+  }
+  .brand-name em { font-style: italic; color: var(--accent); font-weight: 500; }
+  .brand-sub { font-size: 13px; color: var(--text-2); margin-top: 6px; line-height: 1.5; }
+  .brand-sub b { color: var(--accent); font-weight: 600; }
+  .meta { text-align: right; font-size: 12px; color: var(--text-3); line-height: 1.7; flex-shrink: 0; }
+  .meta .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); margin-right: 6px; box-shadow: 0 0 8px var(--ok); animation: pulse 2s infinite; vertical-align: middle; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+  /* MODE SWITCHER */
+  .mode-switcher {
+    display: flex; margin-top: 14px; gap: 0;
+    border: 1px solid var(--line-2); border-radius: 6px; overflow: hidden;
+    width: fit-content; max-width: 100%;
+  }
+  .mode-tab {
+    padding: 11px 20px; font-size: 12px; cursor: pointer;
+    letter-spacing: 0.05em; font-weight: 600;
+    color: var(--text-2); background: var(--bg-2);
+    border: none; border-right: 1px solid var(--line-2);
+    font-family: inherit; transition: all 0.15s;
+    min-height: 44px;
+  }
+  .mode-tab:last-child { border-right: none; }
+  .mode-tab:hover { color: var(--text); background: var(--bg-3); }
+  .mode-tab.active { background: var(--accent); color: #1a1410; font-weight: 700; }
+  .mode-tab .num { display: block; font-size: 10px; opacity: 0.7; margin-bottom: 2px; letter-spacing: 0.15em; }
+
+  /* LAYOUT */
+  main { display: grid; grid-template-columns: 1fr 1fr; gap: 0; min-height: calc(100vh - 130px); }
+  .col { padding: 28px 32px; }
+  .col.left { border-right: 1px solid var(--line); }
+
+  /* SECTIONS */
+  .section { margin-bottom: 32px; }
+  .section-head {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+    padding-bottom: 12px; border-bottom: 1px solid var(--line);
+    flex-wrap: wrap;
+  }
+  .section-num {
+    font-size: 11px; color: #1a1410; background: var(--accent);
+    padding: 4px 8px; font-weight: 700; letter-spacing: 0.05em; border-radius: 3px;
+  }
+  .section-title {
+    font-family: 'Fraunces', serif;
+    font-size: 22px; font-weight: 500; letter-spacing: -0.01em;
+    color: var(--text);
+  }
+  .section-desc { font-size: 12px; color: var(--text-2); margin-left: auto; max-width: 260px; text-align: right; line-height: 1.5; }
+
+  /* INPUTS */
+  textarea, input[type="text"], input[type="url"] {
+    width: 100%; background: var(--bg-2); border: 1px solid var(--line-2);
+    color: var(--text); font-family: inherit; font-size: 14px;
+    padding: 12px 14px; border-radius: 6px; outline: none;
+    transition: border-color 0.15s, background 0.15s;
+    line-height: 1.6;
+  }
+  textarea:focus, input:focus { border-color: var(--accent); background: var(--bg-3); }
+  textarea { resize: vertical; min-height: 110px; }
+  textarea::placeholder, input::placeholder { color: var(--text-3); }
+  .label-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px; }
+  label { font-size: 12px; color: var(--text-2); letter-spacing: 0.05em; font-weight: 600; }
+  .hint { font-size: 11px; color: var(--text-3); }
+
+  /* BUTTONS */
+  .btn {
+    background: var(--bg-2); border: 1px solid var(--line-2); color: var(--text);
+    padding: 11px 18px; font-family: inherit; font-size: 13px; cursor: pointer;
+    letter-spacing: 0.02em; font-weight: 500; border-radius: 6px;
+    transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px;
+    min-height: 44px;
+  }
+  .btn:hover, .btn:active { border-color: var(--accent); color: var(--accent); background: var(--bg-3); }
+  .btn.primary { background: var(--accent); color: #1a1410; border-color: var(--accent); font-weight: 700; }
+  .btn.primary:hover, .btn.primary:active { background: #f5c570; border-color: #f5c570; color: #1a1410; }
+  .btn.danger:hover, .btn.danger:active { border-color: var(--bad); color: var(--bad); }
+  .btn.sm { padding: 8px 14px; font-size: 12px; min-height: 38px; }
+
+  /* MODULES */
+  .rule-templates {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;
+    margin-bottom: 12px;
+  }
+  .rule-template {
+    border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text);
+    padding: 12px 14px; border-radius: 8px; cursor: pointer; text-align: left;
+    font-family: inherit; transition: all 0.15s; min-height: 84px;
+  }
+  .rule-template:hover { border-color: var(--text-3); background: var(--bg-3); }
+  .rule-template.active {
+    border-color: var(--accent); background: var(--accent-soft);
+    box-shadow: 0 0 0 1px var(--accent) inset;
+  }
+  .template-name { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+  .template-desc { display: block; font-size: 11px; line-height: 1.45; color: var(--text-2); }
+  .template-count { display: block; margin-top: 8px; font-size: 10px; color: var(--text-3); }
+  .rule-template.active .template-count { color: var(--accent); }
+  .modules { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .module {
+    border: 1px solid var(--line-2); padding: 14px 16px; border-radius: 8px;
+    cursor: pointer; transition: all 0.15s; position: relative;
+    background: var(--bg-2); min-height: 80px;
+  }
+  .module:hover { border-color: var(--text-3); background: var(--bg-3); }
+  .module.active {
+    border-color: var(--accent); background: var(--accent-soft);
+    box-shadow: 0 0 0 1px var(--accent) inset;
+  }
+  .module-name { font-size: 14px; font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; color: var(--text); }
+  .module-name .icon { font-family: 'Fraunces', serif; font-style: italic; color: var(--accent); font-size: 16px; font-weight: 700; }
+  .module-desc { font-size: 12px; color: var(--text-2); line-height: 1.5; }
+  .module-count { position: absolute; top: 14px; right: 16px; font-size: 11px; color: var(--text-3); font-weight: 500; }
+  .module.active .module-count { color: var(--accent); }
+
+  /* CUSTOM RULES */
+  .custom-rule-row {
+    display: grid; grid-template-columns: 130px 1fr 100px 44px;
+    gap: 6px; margin-bottom: 8px; align-items: stretch;
+  }
+  .custom-rule-row select, .custom-rule-row input {
+    background: var(--bg-2); border: 1px solid var(--line-2); color: var(--text);
+    padding: 10px 12px; font-family: inherit; font-size: 13px; outline: none;
+    border-radius: 6px; min-height: 44px;
+  }
+  .custom-rule-row select:focus, .custom-rule-row input:focus { border-color: var(--accent); }
+  .custom-rule-row .rm-btn {
+    background: var(--bg-2); border: 1px solid var(--line-2); color: var(--text-2);
+    cursor: pointer; padding: 0; font-family: inherit; font-size: 18px;
+    transition: all 0.15s; border-radius: 6px; min-height: 44px;
+  }
+  .custom-rule-row .rm-btn:hover, .custom-rule-row .rm-btn:active { color: var(--bad); border-color: var(--bad); background: rgba(245,92,122,0.08); }
+
+  /* PROXIES */
+  .proxy-block {
+    background: var(--bg-2); border: 1px solid var(--line-2); margin-bottom: 10px;
+    padding: 14px; position: relative; border-radius: 8px;
+  }
+  .proxy-block-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .proxy-block-name { font-size: 12px; font-weight: 700; color: var(--accent); letter-spacing: 0.05em; }
+  .proxy-block textarea { font-size: 13px; min-height: 80px; background: var(--bg); }
+
+  /* OUTPUT */
+  .output-head {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    padding: 14px 24px; background: var(--bg-2); border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 5; flex-wrap: wrap;
+  }
+  .output-status { font-size: 12px; color: var(--text-2); display: flex; align-items: center; gap: 8px; font-weight: 500; }
+  .output-status .light { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); }
+  .output-status.ready .light { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+  .output-status.error .light { background: var(--bad); box-shadow: 0 0 6px var(--bad); }
+  .output-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  pre.output-yaml {
+    background: var(--bg); padding: 22px 24px; font-size: 13px; line-height: 1.75;
+    color: var(--text); overflow: auto; height: calc(100vh - 195px);
+    font-family: 'JetBrains Mono', monospace;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* YAML syntax — improved contrast */
+  .yk { color: #ffb87c; font-weight: 500; }
+  .yv { color: var(--accent); }
+  .ys { color: #b8a8ff; }
+  .yc { color: var(--text-3); font-style: italic; }
+  .yn { color: #7dd9b3; }
+  .yp { color: var(--text-2); }
+
+  /* OPTIONS */
+  .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .opt-row {
+    display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+    border: 1px solid var(--line-2); background: var(--bg-2); cursor: pointer;
+    border-radius: 6px; min-height: 48px;
+    transition: all 0.15s;
+  }
+  .opt-row:hover { border-color: var(--text-3); background: var(--bg-3); }
+  .opt-row input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; width: 18px; height: 18px; flex-shrink: 0; }
+  .opt-row label { font-size: 13px; color: var(--text); cursor: pointer; flex: 1; letter-spacing: 0; font-weight: 500; }
+  .opt-row.checked { border-color: var(--accent); background: var(--accent-soft); }
+
+  /* PORT INPUTS */
+  .port-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .port-grid > div { display: flex; flex-direction: column; gap: 6px; }
+  .port-grid input { padding: 11px 12px; font-size: 13px; }
+
+  /* SELECT */
+  select {
+    background: var(--bg-2); border: 1px solid var(--line-2); color: var(--text);
+    padding: 11px 12px; font-family: inherit; font-size: 13px;
+    border-radius: 6px; outline: none; min-height: 44px; cursor: pointer;
+  }
+  select:focus { border-color: var(--accent); }
+
+  /* TOAST */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(120px);
+    background: var(--bg-3); border: 1px solid var(--accent); color: var(--text);
+    padding: 14px 22px; font-size: 13px; z-index: 200; font-weight: 500;
+    transition: transform 0.3s; box-shadow: 0 8px 32px rgba(0,0,0,0.4); border-radius: 8px;
+    max-width: calc(100vw - 32px);
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.error { border-color: var(--bad); }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
+  /* BASE CONFIG UPLOAD */
+  .base-config-box {
+    border: 2px dashed var(--line-2); padding: 20px; background: var(--bg-2);
+    text-align: center; margin-bottom: 14px; transition: all 0.15s; border-radius: 10px;
+  }
+  .base-config-box.has-file {
+    border-style: solid; border-color: var(--accent); background: var(--accent-soft);
+    text-align: left;
+  }
+  .base-config-box.dragover {
+    border-color: var(--accent); background: rgba(230,180,80,0.15);
+  }
+  .upload-icon { font-size: 36px; color: var(--text-3); margin-bottom: 10px; font-family: 'Fraunces', serif; line-height: 1; }
+  .base-config-box.has-file .upload-icon { color: var(--accent); }
+  .upload-hint { font-size: 13px; color: var(--text-2); margin-bottom: 12px; }
+  .base-config-info { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .base-config-info .name { font-size: 14px; color: var(--accent); font-weight: 700; word-break: break-all; }
+  .base-config-info .stats { font-size: 12px; color: var(--text-2); margin-top: 4px; }
+
+  /* MERGE STRATEGY */
+  .merge-strategy { background: var(--bg-2); border: 1px solid var(--line-2); padding: 14px 16px; margin-top: 12px; border-radius: 8px; }
+  .merge-strategy-title { font-size: 12px; color: var(--text-2); letter-spacing: 0.05em; margin-bottom: 12px; font-weight: 600; }
+  .strategy-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; flex-wrap: wrap; }
+  .strategy-row:last-child { margin-bottom: 0; }
+  .strategy-label { font-size: 13px; color: var(--text); width: 80px; flex-shrink: 0; font-weight: 600; }
+  .strategy-pills { display: flex; gap: 6px; flex: 1; min-width: 0; }
+  .strategy-pill {
+    flex: 1; padding: 9px 8px; font-size: 12px; cursor: pointer;
+    text-align: center; border: 1px solid var(--line-2); background: var(--bg);
+    color: var(--text-2); font-family: inherit; transition: all 0.15s;
+    border-radius: 5px; min-height: 40px; font-weight: 500;
+  }
+  .strategy-pill:hover { color: var(--text); border-color: var(--text-3); }
+  .strategy-pill.active { background: var(--accent); color: #1a1410; border-color: var(--accent); font-weight: 700; }
+
+  /* EDIT MODE BANNER */
+  .edit-mode-banner {
+    background: rgba(245,166,35,0.08);
+    border-left: 3px solid var(--warn);
+    padding: 12px 16px; margin-bottom: 18px; font-size: 13px; color: var(--text); border-radius: 0 6px 6px 0;
+    line-height: 1.6;
+  }
+  .edit-mode-banner b { color: var(--warn); font-weight: 700; }
+
+  /* footer */
+  .foot {
+    border-top: 1px solid var(--line); padding: 16px 32px;
+    font-size: 12px; color: var(--text-2); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  .foot b { color: var(--accent); font-weight: 600; }
+
+  /* ============ MOBILE TABS (only render on mobile) ============ */
+  .mobile-tabs {
+    display: none;
+    position: sticky; top: 0; z-index: 20;
+    background: var(--bg-2); border-bottom: 1px solid var(--line);
+  }
+  .mobile-tab {
+    flex: 1; padding: 14px 8px; background: transparent; border: none;
+    color: var(--text-2); font-family: inherit; font-size: 13px; font-weight: 600;
+    cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.15s;
+    min-height: 50px;
+  }
+  .mobile-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ============ MOBILE LAYOUT ============ */
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; min-height: auto; }
+    .col.left { border-right: none; border-bottom: 1px solid var(--line); }
+    .col { padding: 24px 18px; }
+
+    header {
+      padding: 20px 18px;
+      flex-direction: column; align-items: flex-start; gap: 8px;
+    }
+    .meta { text-align: left; }
+    .brand-name { font-size: 32px; }
+    .brand-sub { font-size: 12px; }
+    .mode-switcher { width: 100%; }
+    .mode-tab { flex: 1; padding: 11px 10px; font-size: 12px; }
+
+    .section-head { gap: 10px; }
+    .section-title { font-size: 19px; }
+    .section-desc { display: none; }
+
+    .rule-templates { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .rule-template { min-height: 76px; padding: 11px 12px; }
+    .modules { grid-template-columns: 1fr; gap: 8px; }
+    .options-grid { grid-template-columns: 1fr; gap: 8px; }
+
+    /* Custom rules: stack on mobile */
+    .custom-rule-row {
+      grid-template-columns: 1fr 44px;
+      grid-template-rows: auto auto auto;
+      gap: 6px;
+    }
+    .custom-rule-row > select:nth-child(1) { grid-column: 1 / 3; grid-row: 1; }
+    .custom-rule-row > input { grid-column: 1 / 3; grid-row: 2; }
+    .custom-rule-row > select:nth-child(3) { grid-column: 1; grid-row: 3; }
+    .custom-rule-row > .rm-btn { grid-column: 2; grid-row: 3; }
+
+    .strategy-row { flex-direction: column; align-items: stretch; gap: 6px; }
+    .strategy-label { width: auto; }
+    .strategy-pills { width: 100%; }
+
+    .output-head { padding: 12px 16px; }
+    pre.output-yaml { padding: 16px; font-size: 12.5px; height: 65vh; }
+
+    .foot { padding: 14px 18px; }
+
+    /* Mobile tab navigation */
+    .mobile-tabs { display: flex; }
+    main.mobile-tabbed > .col { display: none; }
+    main.mobile-tabbed > .col.active-tab { display: block; }
+  }
+
+  @media (max-width: 480px) {
+    .brand-name { font-size: 28px; }
+    header { padding: 18px 16px; }
+    .col { padding: 20px 16px; }
+    .section { margin-bottom: 26px; }
+    .port-grid { grid-template-columns: 1fr; gap: 8px; }
+    .output-actions { width: 100%; }
+    .output-actions .btn { flex: 1; justify-content: center; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-tag">CLASH · CONFIG · FORGE</div>
+    <div class="brand-name">Config <em>Forge</em></div>
+    <div class="brand-sub">订阅合并 · 规则编排 · YAML 实时生成 — <b>v1.1</b></div>
+    <div class="mode-switcher" id="modeSwitcher">
+      <button class="mode-tab active" data-mode="create"><span class="num">MODE 01</span>从零创建</button>
+      <button class="mode-tab" data-mode="edit"><span class="num">MODE 02</span>编辑现有配置</button>
+    </div>
+  </div>
+  <div class="meta">
+    <div><span class="dot"></span> READY</div>
+    <div>Mihomo / Clash.Meta 兼容</div>
+    <div id="time">--:--:--</div>
+  </div>
+</header>
+
+<div class="mobile-tabs" id="mobileTabs">
+  <button class="mobile-tab active" data-tab="input">⚙ 配置</button>
+  <button class="mobile-tab" data-tab="output">↳ 预览 YAML</button>
+</div>
+
+<main id="mainContent">
+  <!-- LEFT COLUMN: INPUTS -->
+  <section class="col left active-tab" data-tab="input">
+
+    <!-- 0. BASE CONFIG (edit mode only) -->
+    <div class="section" id="baseConfigSection" style="display: none;">
+      <div class="section-head">
+        <span class="section-num" style="background: var(--warn);">00</span>
+        <h2 class="section-title">Base Config</h2>
+        <div class="section-desc">上传现有 YAML 作为基础配置</div>
+      </div>
+
+      <div class="edit-mode-banner">
+        <b>编辑模式</b> · 现有配置的所有字段（DNS、TUN、proxy-providers 等）都会保留，下方添加的内容会按策略合并进去
+      </div>
+
+      <div class="base-config-box" id="baseConfigBox">
+        <div id="baseConfigEmpty">
+          <div class="upload-icon">↥</div>
+          <div class="upload-hint">拖拽 .yaml 文件到此处，或点击选择</div>
+          <button class="btn sm" id="uploadBtn">选择文件</button>
+          <button class="btn sm" id="pasteBaseBtn" style="margin-left: 4px;">粘贴 YAML</button>
+        </div>
+        <div id="baseConfigLoaded" style="display: none;">
+          <div class="base-config-info">
+            <div>
+              <div class="name" id="baseFileName">config.yaml</div>
+              <div class="stats" id="baseStats">— 个节点 · — 条规则 · — 个分组</div>
+            </div>
+            <button class="btn sm danger" id="clearBaseBtn">移除</button>
+          </div>
+        </div>
+      </div>
+
+      <textarea id="basePasteArea" placeholder="粘贴现有 YAML 配置内容..." style="display: none; min-height: 140px;"></textarea>
+      <div id="basePasteActions" style="display: none; margin-top: 8px; gap: 6px; display: none;">
+        <button class="btn sm primary" id="confirmPasteBaseBtn">解析</button>
+        <button class="btn sm" id="cancelPasteBaseBtn">取消</button>
+      </div>
+
+      <input type="file" id="fileInput" accept=".yaml,.yml,.txt" style="display: none;">
+
+      <div class="merge-strategy">
+        <div class="merge-strategy-title">合并策略 / Merge Strategy</div>
+        <div class="strategy-row">
+          <div class="strategy-label">Proxies</div>
+          <div class="strategy-pills" data-strategy="proxies">
+            <button class="strategy-pill active" data-val="append">追加</button>
+            <button class="strategy-pill" data-val="replace">替换</button>
+            <button class="strategy-pill" data-val="keep">仅保留原有</button>
+          </div>
+        </div>
+        <div class="strategy-row">
+          <div class="strategy-label">Rules</div>
+          <div class="strategy-pills" data-strategy="rules">
+            <button class="strategy-pill active" data-val="prepend">前置（优先）</button>
+            <button class="strategy-pill" data-val="append">追加（末尾）</button>
+            <button class="strategy-pill" data-val="replace">替换</button>
+          </div>
+        </div>
+        <div class="strategy-row">
+          <div class="strategy-label">Groups</div>
+          <div class="strategy-pills" data-strategy="groups">
+            <button class="strategy-pill active" data-val="merge">合并节点</button>
+            <button class="strategy-pill" data-val="keep">仅保留原有</button>
+            <button class="strategy-pill" data-val="replace">替换</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1. SUBSCRIPTIONS -->
+    <div class="section">
+      <div class="section-head">
+        <span class="section-num">01</span>
+        <h2 class="section-title">Subscriptions</h2>
+        <div class="section-desc">输入订阅 URL（每行一个）或直接粘贴 YAML 内容</div>
+      </div>
+
+      <div class="label-row">
+        <label>订阅链接 / Subscription URLs</label>
+        <span class="hint">每行一个 · 支持 #备注名</span>
+      </div>
+      <textarea id="subUrls" placeholder="https://example.com/sub.yaml#机场A&#10;https://another.com/clash#机场B"></textarea>
+
+      <div style="margin-top: 12px;">
+        <div class="label-row">
+          <label>或粘贴 YAML 内容</label>
+          <span class="hint">直接粘贴订阅返回的 YAML</span>
+        </div>
+        <textarea id="subYaml" placeholder="proxies:&#10;  - name: 节点1&#10;    type: ss&#10;    ..."></textarea>
+      </div>
+
+      <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+        <button class="btn" id="fetchBtn">⟳ 拉取订阅</button>
+        <button class="btn" id="parseYamlBtn">↳ 解析粘贴内容</button>
+        <span id="proxyCount" style="margin-left: auto; font-size: 10px; color: var(--text-3); align-self: center;">0 个节点已加载</span>
+      </div>
+    </div>
+
+    <!-- 2. PRESET RULE MODULES -->
+    <div class="section">
+      <div class="section-head">
+        <span class="section-num">02</span>
+        <h2 class="section-title">Rule Modules</h2>
+        <div class="section-desc">模板选择 + 单独启用预置规则</div>
+      </div>
+      <div class="rule-templates" id="ruleTemplates"></div>
+      <div class="modules" id="modules"></div>
+    </div>
+
+    <!-- 3. CUSTOM RULES -->
+    <div class="section">
+      <div class="section-head">
+        <span class="section-num">03</span>
+        <h2 class="section-title">Custom Rules</h2>
+        <div class="section-desc">添加你自己的规则</div>
+      </div>
+      <div id="customRules"></div>
+      <button class="btn sm" id="addRuleBtn" style="margin-top: 8px;">＋ 添加规则</button>
+    </div>
+
+    <!-- 4. EXTRA PROXIES -->
+    <div class="section">
+      <div class="section-head">
+        <span class="section-num">04</span>
+        <h2 class="section-title">Extra Proxies</h2>
+        <div class="section-desc">手动添加自建节点</div>
+      </div>
+      <div id="extraProxies"></div>
+      <button class="btn sm" id="addProxyBtn" style="margin-top: 8px;">＋ 添加节点</button>
+    </div>
+
+    <!-- 5. CORE OPTIONS -->
+    <div class="section" id="coreOptionsSection">
+      <div class="section-head">
+        <span class="section-num">05</span>
+        <h2 class="section-title">Core Options</h2>
+        <div class="section-desc">基础参数（仅创建模式）</div>
+      </div>
+
+      <div class="port-grid" style="margin-bottom: 12px;">
+        <div>
+          <label>HTTP Port</label>
+          <input type="text" id="portHttp" value="7890">
+        </div>
+        <div>
+          <label>SOCKS Port</label>
+          <input type="text" id="portSocks" value="7891">
+        </div>
+        <div>
+          <label>Mixed Port</label>
+          <input type="text" id="portMixed" value="7890">
+        </div>
+      </div>
+
+      <div class="options-grid">
+        <div class="opt-row" data-opt><input type="checkbox" id="optAllowLan" checked><label for="optAllowLan">allow-lan</label></div>
+        <div class="opt-row" data-opt><input type="checkbox" id="optIpv6"><label for="optIpv6">ipv6</label></div>
+        <div class="opt-row" data-opt><input type="checkbox" id="optTun"><label for="optTun">TUN 模式</label></div>
+        <div class="opt-row" data-opt><input type="checkbox" id="optDns" checked><label for="optDns">自定义 DNS</label></div>
+      </div>
+
+      <div style="margin-top: 12px;">
+        <label>Mode</label>
+        <select id="optMode" style="width: 100%; background: var(--bg-2); border: 1px solid var(--line); color: var(--text); padding: 8px 10px; font-family: inherit; font-size: 11px; margin-top: 4px;">
+          <option value="rule">rule</option>
+          <option value="global">global</option>
+          <option value="direct">direct</option>
+        </select>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- RIGHT COLUMN: OUTPUT -->
+  <section class="col" style="padding: 0;" data-tab="output">
+    <div class="output-head">
+      <div class="output-status ready" id="outputStatus">
+        <span class="light"></span>
+        <span id="statusText">配置已生成</span>
+      </div>
+      <div class="output-actions">
+        <button class="btn sm" id="copyBtn">⧉ 复制</button>
+        <button class="btn sm primary" id="downloadBtn">↓ 下载 YAML</button>
+      </div>
+    </div>
+    <pre class="output-yaml" id="output"></pre>
+  </section>
+</main>
+
+<div class="foot">
+  <span>本地运行 · 数据不上传 · <b>js-yaml</b> 解析 · <b>Mihomo</b> 兼容</span>
+  <span id="lineCount">0 行</span>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+ * STATE
+ * ============================================================ */
+const state = {
+  mode: 'create',          // 'create' | 'edit'
+  baseConfig: null,        // parsed base YAML object
+  baseFileName: '',
+  mergeStrategy: {
+    proxies: 'append',     // append | replace | keep
+    rules: 'prepend',      // prepend | append | replace
+    groups: 'merge',       // merge | keep | replace
+  },
+  fetchedProxies: [],   // proxies parsed from subscriptions
+  pastedProxies: [],    // proxies from pasted YAML
+  extraProxies: [],     // user-added proxies (raw YAML strings)
+  customRules: [],      // {type, value, action}
+  enabledModules: new Set(['CN_DIRECT', 'AI', 'GOOGLE']),
+  activeRuleTemplate: 'BALANCED',
+};
+
+/* ============================================================
+ * PRESET RULE MODULES
+ * Each module has: rules[], proxyGroup name, description
+ * ============================================================ */
+const RULE_TEMPLATES = {
+  BALANCED: {
+    name: 'Balanced',
+    desc: '日常代理 / AI / 国内直连',
+    modules: ['CN_DIRECT', 'AI', 'GOOGLE'],
+  },
+  LOAD_BALANCE: {
+    name: 'Load Balance',
+    desc: '测速、下载、大流量走 Balance',
+    modules: ['CN_DIRECT', 'AI', 'GOOGLE', 'LOAD_BALANCE'],
+  },
+  STREAMING: {
+    name: 'Streaming',
+    desc: 'Netflix / Disney+ / Spotify / Twitch',
+    modules: ['CN_DIRECT', 'GOOGLE', 'STREAMING', 'LIVE_STREAM'],
+  },
+  FULL_MEDIA: {
+    name: 'Full Media',
+    desc: 'AI + 流媒体 + 负载均衡 + 广告拦截',
+    modules: ['AD_BLOCK', 'CN_DIRECT', 'AI', 'GOOGLE', 'STREAMING', 'LIVE_STREAM', 'LOAD_BALANCE'],
+  },
+};
+
+const MODULES = {
+  AD_BLOCK: {
+    name: 'Ad Block',
+    icon: '⊘',
+    desc: '广告 / 追踪域名拦截',
+    group: 'REJECT',
+    rules: [
+      'DOMAIN-KEYWORD,doubleclick',
+      'DOMAIN-KEYWORD,adservice',
+      'DOMAIN-KEYWORD,adnxs',
+      'DOMAIN-KEYWORD,googletagmanager',
+      'DOMAIN-KEYWORD,googlesyndication',
+      'DOMAIN-SUFFIX,adsystem.com',
+      'DOMAIN-SUFFIX,adservice.google.com',
+      'DOMAIN-SUFFIX,googleadservices.com',
+      'DOMAIN-SUFFIX,scorecardresearch.com',
+      'DOMAIN-SUFFIX,umeng.com',
+      'DOMAIN-SUFFIX,umengcloud.com',
+      'DOMAIN-SUFFIX,cnzz.com',
+      'DOMAIN-SUFFIX,51.la',
+    ],
+  },
+  AI: {
+    name: 'AI Services',
+    icon: 'Æ',
+    desc: 'Claude · OpenAI · Gemini · Perplexity',
+    group: 'AI',
+    rules: [
+      'DOMAIN-SUFFIX,anthropic.com',
+      'DOMAIN-SUFFIX,claude.ai',
+      'DOMAIN-SUFFIX,openai.com',
+      'DOMAIN-SUFFIX,chatgpt.com',
+      'DOMAIN-SUFFIX,oaistatic.com',
+      'DOMAIN-SUFFIX,oaiusercontent.com',
+      'DOMAIN-SUFFIX,gemini.google.com',
+      'DOMAIN-SUFFIX,bard.google.com',
+      'DOMAIN-SUFFIX,generativelanguage.googleapis.com',
+      'DOMAIN-SUFFIX,ai.google.dev',
+      'DOMAIN-SUFFIX,perplexity.ai',
+      'DOMAIN-SUFFIX,poe.com',
+      'DOMAIN-SUFFIX,x.ai',
+      'DOMAIN-SUFFIX,grok.com',
+      'DOMAIN-SUFFIX,mistral.ai',
+      'DOMAIN-SUFFIX,cohere.ai',
+      'DOMAIN-SUFFIX,huggingface.co',
+    ],
+  },
+  STREAMING: {
+    name: 'Streaming Global',
+    icon: 'S',
+    desc: 'Netflix · Disney+ · HBO/Max · Spotify',
+    group: 'Streaming',
+    rules: [
+      'DOMAIN-SUFFIX,netflix.com',
+      'DOMAIN-SUFFIX,netflix.net',
+      'DOMAIN-SUFFIX,nflxext.com',
+      'DOMAIN-SUFFIX,nflximg.net',
+      'DOMAIN-SUFFIX,nflxso.net',
+      'DOMAIN-SUFFIX,nflxvideo.net',
+      'DOMAIN-SUFFIX,disneyplus.com',
+      'DOMAIN-SUFFIX,disney-plus.net',
+      'DOMAIN-SUFFIX,dssott.com',
+      'DOMAIN-SUFFIX,bamgrid.com',
+      'DOMAIN-SUFFIX,hulu.com',
+      'DOMAIN-SUFFIX,hbomax.com',
+      'DOMAIN-SUFFIX,max.com',
+      'DOMAIN-SUFFIX,hbo.com',
+      'DOMAIN-SUFFIX,primevideo.com',
+      'DOMAIN-SUFFIX,amazonvideo.com',
+      'DOMAIN-SUFFIX,media-amazon.com',
+      'DOMAIN-SUFFIX,tv.apple.com',
+      'DOMAIN-SUFFIX,peacocktv.com',
+      'DOMAIN-SUFFIX,paramountplus.com',
+      'DOMAIN-SUFFIX,spotify.com',
+      'DOMAIN-SUFFIX,scdn.co',
+      'DOMAIN-SUFFIX,tidal.com',
+    ],
+  },
+  LIVE_STREAM: {
+    name: 'Live / Short Video',
+    icon: 'L',
+    desc: 'Twitch · TikTok · Kick 直播短视频',
+    group: 'Streaming',
+    rules: [
+      'DOMAIN-SUFFIX,twitch.tv',
+      'DOMAIN-SUFFIX,ttvnw.net',
+      'DOMAIN-SUFFIX,jtvnw.net',
+      'DOMAIN-SUFFIX,ext-twitch.tv',
+      'DOMAIN-SUFFIX,kick.com',
+      'DOMAIN-SUFFIX,tiktok.com',
+      'DOMAIN-SUFFIX,tiktokv.com',
+      'DOMAIN-SUFFIX,tiktokcdn.com',
+      'DOMAIN-SUFFIX,musical.ly',
+      'DOMAIN-SUFFIX,byteoversea.com',
+    ],
+  },
+  GOOGLE: {
+    name: 'Google · YouTube · TG',
+    icon: 'G',
+    desc: 'Google 全家桶 + YouTube + Telegram',
+    group: 'Proxy',
+    rules: [
+      'DOMAIN-SUFFIX,google.com',
+      'DOMAIN-SUFFIX,googleapis.com',
+      'DOMAIN-SUFFIX,googleusercontent.com',
+      'DOMAIN-SUFFIX,gstatic.com',
+      'DOMAIN-SUFFIX,ggpht.com',
+      'DOMAIN-SUFFIX,youtube.com',
+      'DOMAIN-SUFFIX,youtu.be',
+      'DOMAIN-SUFFIX,ytimg.com',
+      'DOMAIN-SUFFIX,googlevideo.com',
+      'DOMAIN-SUFFIX,telegram.org',
+      'DOMAIN-SUFFIX,t.me',
+      'DOMAIN-SUFFIX,tdesktop.com',
+      'IP-CIDR,91.108.4.0/22,no-resolve',
+      'IP-CIDR,91.108.8.0/22,no-resolve',
+      'IP-CIDR,91.108.12.0/22,no-resolve',
+      'IP-CIDR,91.108.16.0/22,no-resolve',
+      'IP-CIDR,91.108.56.0/22,no-resolve',
+      'IP-CIDR,149.154.160.0/20,no-resolve',
+    ],
+  },
+  LOAD_BALANCE: {
+    name: 'Load Balance',
+    icon: 'B',
+    desc: '测速 / 下载 / 大文件 CDN 走 Balance',
+    group: 'Balance',
+    rules: [
+      'DOMAIN-SUFFIX,speedtest.net',
+      'DOMAIN-SUFFIX,ooklaserver.net',
+      'DOMAIN-SUFFIX,fast.com',
+      'DOMAIN-SUFFIX,steamcontent.com',
+      'DOMAIN-SUFFIX,steamstatic.com',
+      'DOMAIN-SUFFIX,steamserver.net',
+      'DOMAIN-SUFFIX,epicgames.com',
+      'DOMAIN-SUFFIX,epicgames-download1.akamaized.net',
+      'DOMAIN-SUFFIX,github-releases.githubusercontent.com',
+      'DOMAIN-SUFFIX,objects.githubusercontent.com',
+      'DOMAIN-SUFFIX,release-assets.githubusercontent.com',
+      'DOMAIN-SUFFIX,download.jetbrains.com',
+      'DOMAIN-SUFFIX,dl.google.com',
+      'DOMAIN-SUFFIX,update.googleapis.com',
+    ],
+  },
+  CN_DIRECT: {
+    name: 'CN Direct',
+    icon: '中',
+    desc: '国内域名 + CN IP-CIDR 直连',
+    group: 'DIRECT',
+    rules: [
+      'DOMAIN-SUFFIX,cn',
+      'DOMAIN-KEYWORD,baidu',
+      'DOMAIN-SUFFIX,qq.com',
+      'DOMAIN-SUFFIX,tencent.com',
+      'DOMAIN-SUFFIX,weixin.qq.com',
+      'DOMAIN-SUFFIX,taobao.com',
+      'DOMAIN-SUFFIX,tmall.com',
+      'DOMAIN-SUFFIX,alipay.com',
+      'DOMAIN-SUFFIX,alibaba.com',
+      'DOMAIN-SUFFIX,bilibili.com',
+      'DOMAIN-SUFFIX,iqiyi.com',
+      'DOMAIN-SUFFIX,qiyi.com',
+      'DOMAIN-SUFFIX,youku.com',
+      'DOMAIN-SUFFIX,mgtv.com',
+      'DOMAIN-SUFFIX,acfun.cn',
+      'DOMAIN-SUFFIX,kugou.com',
+      'DOMAIN-SUFFIX,kuwo.cn',
+      'DOMAIN-SUFFIX,music.163.com',
+      'DOMAIN-SUFFIX,jd.com',
+      'DOMAIN-SUFFIX,163.com',
+      'DOMAIN-SUFFIX,126.com',
+      'DOMAIN-SUFFIX,xiaomi.com',
+      'DOMAIN-SUFFIX,mi.com',
+      'DOMAIN-SUFFIX,douyin.com',
+      'DOMAIN-SUFFIX,toutiao.com',
+      'DOMAIN-SUFFIX,zhihu.com',
+      'GEOIP,CN,no-resolve',
+    ],
+  },
+};
+
+/* ============================================================
+ * RENDER MODULES UI
+ * ============================================================ */
+function moduleSetKey(modules) {
+  return [...modules].sort().join('|');
+}
+
+function syncActiveRuleTemplate() {
+  const enabledKey = moduleSetKey(state.enabledModules);
+  const match = Object.entries(RULE_TEMPLATES).find(([, t]) => moduleSetKey(t.modules) === enabledKey);
+  state.activeRuleTemplate = match ? match[0] : 'CUSTOM';
+}
+
+function renderRuleTemplates() {
+  const wrap = document.getElementById('ruleTemplates');
+  wrap.innerHTML = '';
+  Object.entries(RULE_TEMPLATES).forEach(([key, t]) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'rule-template' + (state.activeRuleTemplate === key ? ' active' : '');
+    btn.innerHTML = `
+      <span class="template-name">${t.name}</span>
+      <span class="template-desc">${t.desc}</span>
+      <span class="template-count">${t.modules.length} modules</span>
+    `;
+    btn.addEventListener('click', () => {
+      state.enabledModules = new Set(t.modules);
+      state.activeRuleTemplate = key;
+      renderRuleTemplates();
+      renderModules();
+      generate();
+    });
+    wrap.appendChild(btn);
+  });
+}
+
+function renderModules() {
+  const wrap = document.getElementById('modules');
+  wrap.innerHTML = '';
+  Object.entries(MODULES).forEach(([key, m]) => {
+    const el = document.createElement('div');
+    el.className = 'module' + (state.enabledModules.has(key) ? ' active' : '');
+    el.innerHTML = `
+      <div class="module-name"><span class="icon">${m.icon}</span> ${m.name}</div>
+      <div class="module-desc">${m.desc}</div>
+      <div class="module-count">${m.rules.length} rules → ${m.group}</div>
+    `;
+    el.addEventListener('click', () => {
+      if (state.enabledModules.has(key)) state.enabledModules.delete(key);
+      else state.enabledModules.add(key);
+      syncActiveRuleTemplate();
+      renderRuleTemplates();
+      renderModules();
+      generate();
+    });
+    wrap.appendChild(el);
+  });
+}
+
+const GENERATED_POLICY_GROUPS = ['AI', 'Streaming', 'Balance'];
+
+function uniqueList(items) {
+  const seen = new Set();
+  return items.filter(item => {
+    if (!item || seen.has(item)) return false;
+    seen.add(item);
+    return true;
+  });
+}
+
+function getEnabledPolicyGroups() {
+  const groups = new Set();
+  Object.entries(MODULES).forEach(([key, m]) => {
+    if (state.enabledModules.has(key) && GENERATED_POLICY_GROUPS.includes(m.group)) {
+      groups.add(m.group);
+    }
+  });
+  return GENERATED_POLICY_GROUPS.filter(name => groups.has(name));
+}
+
+function buildCoreProxyGroups(proxyNames) {
+  return [
+    { name: 'Proxy', type: 'select', proxies: ['auto', 'DIRECT', ...proxyNames] },
+    {
+      name: 'auto', type: 'url-test',
+      url: 'http://www.gstatic.com/generate_204',
+      interval: 300, tolerance: 50,
+      proxies: proxyNames.length ? proxyNames : ['DIRECT'],
+    },
+  ];
+}
+
+function buildPolicyGroup(name, proxyNames, options = {}) {
+  if (name === 'Balance') {
+    return {
+      name: 'Balance', type: 'load-balance',
+      url: 'http://www.gstatic.com/generate_204',
+      interval: 300, strategy: 'consistent-hashing',
+      proxies: proxyNames.length ? proxyNames : ['DIRECT'],
+    };
+  }
+
+  return {
+    name,
+    type: 'select',
+    proxies: uniqueList([
+      options.primaryGroupName !== name ? options.primaryGroupName : null,
+      options.hasAuto ? 'auto' : null,
+      'DIRECT',
+      ...proxyNames,
+    ]),
+  };
+}
+
+function buildEnabledPolicyGroups(proxyNames, options = {}) {
+  const existingNames = new Set((options.existingGroups || []).map(g => g.name));
+  return getEnabledPolicyGroups()
+    .filter(name => !existingNames.has(name))
+    .map(name => buildPolicyGroup(name, proxyNames, options));
+}
+
+function findPrimaryPolicyGroup(groups) {
+  return groups.find(g => /proxy|select|节点|代理|手动|global/i.test(g.name || ''))?.name
+    || groups.find(g => Array.isArray(g.proxies) && !GENERATED_POLICY_GROUPS.includes(g.name))?.name
+    || '';
+}
+
+function formatModuleRule(rule, group) {
+  const raw = String(rule).trim();
+  const parts = raw.split(',').map(p => p.trim());
+  if (parts[parts.length - 1]?.toLowerCase() === 'no-resolve') {
+    parts.splice(parts.length - 1, 0, group);
+    return parts.join(',');
+  }
+  return `${raw},${group}`;
+}
+
+/* ============================================================
+ * CUSTOM RULES UI
+ * ============================================================ */
+const RULE_TYPES = ['DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'DOMAIN', 'IP-CIDR', 'IP-CIDR6', 'GEOIP', 'PROCESS-NAME', 'DST-PORT'];
+const RULE_ACTIONS = ['Proxy', 'DIRECT', 'REJECT', 'AI', 'auto'];
+
+function renderCustomRules() {
+  const wrap = document.getElementById('customRules');
+  wrap.innerHTML = '';
+  state.customRules.forEach((r, i) => {
+    const row = document.createElement('div');
+    row.className = 'custom-rule-row';
+    row.innerHTML = `
+      <select data-i="${i}" data-f="type">${RULE_TYPES.map(t => `<option ${t === r.type ? 'selected' : ''}>${t}</option>`).join('')}</select>
+      <input type="text" data-i="${i}" data-f="value" value="${r.value}" placeholder="example.com">
+      <select data-i="${i}" data-f="action">${RULE_ACTIONS.map(a => `<option ${a === r.action ? 'selected' : ''}>${a}</option>`).join('')}</select>
+      <button class="rm-btn" data-rm="${i}">×</button>
+    `;
+    wrap.appendChild(row);
+  });
+  wrap.querySelectorAll('select, input').forEach(el => {
+    el.addEventListener('input', e => {
+      const i = +e.target.dataset.i;
+      const f = e.target.dataset.f;
+      state.customRules[i][f] = e.target.value;
+      generate();
+    });
+  });
+  wrap.querySelectorAll('.rm-btn').forEach(b => {
+    b.addEventListener('click', e => {
+      state.customRules.splice(+e.target.dataset.rm, 1);
+      renderCustomRules();
+      generate();
+    });
+  });
+}
+
+document.getElementById('addRuleBtn').addEventListener('click', () => {
+  state.customRules.push({ type: 'DOMAIN-SUFFIX', value: '', action: 'Proxy' });
+  renderCustomRules();
+  generate();
+});
+
+/* ============================================================
+ * EXTRA PROXIES UI
+ * ============================================================ */
+function renderExtraProxies() {
+  const wrap = document.getElementById('extraProxies');
+  wrap.innerHTML = '';
+  state.extraProxies.forEach((p, i) => {
+    const block = document.createElement('div');
+    block.className = 'proxy-block';
+    block.innerHTML = `
+      <div class="proxy-block-head">
+        <div class="proxy-block-name">PROXY #${i + 1}</div>
+        <button class="btn sm danger" data-rm-p="${i}">移除</button>
+      </div>
+      <textarea data-pi="${i}" placeholder="name: My-Server&#10;type: ss&#10;server: 1.2.3.4&#10;port: 443&#10;cipher: aes-256-gcm&#10;password: xxx">${p}</textarea>
+    `;
+    wrap.appendChild(block);
+  });
+  wrap.querySelectorAll('textarea').forEach(t => {
+    t.addEventListener('input', e => {
+      state.extraProxies[+e.target.dataset.pi] = e.target.value;
+      generate();
+    });
+  });
+  wrap.querySelectorAll('[data-rm-p]').forEach(b => {
+    b.addEventListener('click', e => {
+      state.extraProxies.splice(+e.target.dataset.rmP, 1);
+      renderExtraProxies();
+      generate();
+    });
+  });
+}
+
+document.getElementById('addProxyBtn').addEventListener('click', () => {
+  state.extraProxies.push('');
+  renderExtraProxies();
+  generate();
+});
+
+/* ============================================================
+ * SUBSCRIPTION FETCHING
+ * ============================================================ */
+async function fetchSubs() {
+  const lines = document.getElementById('subUrls').value.trim().split('\n').filter(Boolean);
+  if (!lines.length) {
+    toast('请先输入至少一个订阅链接', true);
+    return;
+  }
+  setStatus('正在拉取订阅...', 'loading');
+  const all = [];
+  let okCount = 0, failCount = 0;
+  for (const line of lines) {
+    const [url, tag] = line.split('#');
+    try {
+      // Try direct fetch first; if blocked by CORS, suggest paste fallback
+      const res = await fetch(url.trim(), { headers: { 'User-Agent': 'clash-meta' } });
+      const text = await res.text();
+      const proxies = parseProxiesFromYaml(text);
+      if (tag) proxies.forEach(p => p.name = `[${tag}] ${p.name}`);
+      all.push(...proxies);
+      okCount++;
+    } catch (err) {
+      failCount++;
+      console.warn('Fetch failed:', url, err);
+    }
+  }
+  state.fetchedProxies = all;
+  updateProxyCount();
+  if (okCount) {
+    setStatus(`已加载 ${all.length} 个节点`, 'ready');
+    toast(`成功 ${okCount} · 失败 ${failCount}${failCount ? '（CORS 限制时请改用粘贴 YAML）' : ''}`);
+  } else {
+    setStatus('全部拉取失败 — 浏览器 CORS 限制，请改用粘贴 YAML', 'error');
+    toast('拉取失败：浏览器 CORS 限制。请将订阅返回的 YAML 直接粘贴到下方文本框', true);
+  }
+  generate();
+}
+
+function parsePastedYaml() {
+  const text = document.getElementById('subYaml').value.trim();
+  if (!text) { toast('粘贴框为空', true); return; }
+  try {
+    const proxies = parseProxiesFromYaml(text);
+    state.pastedProxies = proxies;
+    updateProxyCount();
+    setStatus(`已解析 ${proxies.length} 个节点`, 'ready');
+    toast(`解析成功：${proxies.length} 个节点`);
+    generate();
+  } catch (err) {
+    setStatus('YAML 解析失败', 'error');
+    toast('YAML 解析失败：' + err.message, true);
+  }
+}
+
+function parseProxiesFromYaml(text) {
+  // Try to handle base64-encoded subs gracefully
+  let yamlText = text;
+  if (!/proxies\s*:/i.test(text) && !/proxy-providers/i.test(text)) {
+    try {
+      const decoded = atob(text.replace(/\s/g, ''));
+      if (/proxies\s*:/i.test(decoded)) yamlText = decoded;
+    } catch (e) { /* not base64 */ }
+  }
+  const doc = jsyaml.load(yamlText);
+  if (!doc) return [];
+  if (Array.isArray(doc.proxies)) return doc.proxies;
+  return [];
+}
+
+function updateProxyCount() {
+  const total = state.fetchedProxies.length + state.pastedProxies.length;
+  document.getElementById('proxyCount').textContent = `${total} 个节点已加载`;
+}
+
+document.getElementById('fetchBtn').addEventListener('click', fetchSubs);
+document.getElementById('parseYamlBtn').addEventListener('click', parsePastedYaml);
+
+/* ============================================================
+ * MODE SWITCHING
+ * ============================================================ */
+document.querySelectorAll('.mode-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    state.mode = tab.dataset.mode;
+    document.getElementById('baseConfigSection').style.display = state.mode === 'edit' ? 'block' : 'none';
+    document.getElementById('coreOptionsSection').style.display = state.mode === 'edit' ? 'none' : 'block';
+    generate();
+  });
+});
+
+/* ============================================================
+ * BASE CONFIG UPLOAD
+ * ============================================================ */
+const fileInput = document.getElementById('fileInput');
+const baseBox = document.getElementById('baseConfigBox');
+
+document.getElementById('uploadBtn').addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (file) loadBaseFile(file);
+});
+
+// Drag and drop
+['dragenter', 'dragover'].forEach(ev =>
+  baseBox.addEventListener(ev, e => { e.preventDefault(); baseBox.classList.add('dragover'); })
+);
+['dragleave', 'drop'].forEach(ev =>
+  baseBox.addEventListener(ev, e => { e.preventDefault(); baseBox.classList.remove('dragover'); })
+);
+baseBox.addEventListener('drop', e => {
+  const file = e.dataTransfer.files[0];
+  if (file) loadBaseFile(file);
+});
+
+function loadBaseFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      parseBaseYaml(e.target.result, file.name);
+    } catch (err) {
+      toast('解析失败: ' + err.message, true);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function parseBaseYaml(text, filename) {
+  const doc = jsyaml.load(text);
+  if (!doc || typeof doc !== 'object') throw new Error('不是有效的 YAML 对象');
+  state.baseConfig = doc;
+  state.baseFileName = filename || 'pasted-config.yaml';
+  document.getElementById('baseConfigEmpty').style.display = 'none';
+  document.getElementById('baseConfigLoaded').style.display = 'block';
+  document.getElementById('baseConfigBox').classList.add('has-file');
+  document.getElementById('baseFileName').textContent = state.baseFileName;
+  const pCount = (doc.proxies || []).length;
+  const rCount = (doc.rules || []).length;
+  const gCount = (doc['proxy-groups'] || []).length;
+  document.getElementById('baseStats').textContent = `${pCount} 个节点 · ${rCount} 条规则 · ${gCount} 个分组`;
+  toast(`已加载基础配置: ${state.baseFileName}`);
+  generate();
+}
+
+document.getElementById('clearBaseBtn').addEventListener('click', () => {
+  state.baseConfig = null;
+  state.baseFileName = '';
+  document.getElementById('baseConfigEmpty').style.display = 'block';
+  document.getElementById('baseConfigLoaded').style.display = 'none';
+  document.getElementById('baseConfigBox').classList.remove('has-file');
+  fileInput.value = '';
+  generate();
+});
+
+// Paste base YAML flow
+document.getElementById('pasteBaseBtn').addEventListener('click', () => {
+  document.getElementById('basePasteArea').style.display = 'block';
+  document.getElementById('basePasteActions').style.display = 'flex';
+});
+document.getElementById('cancelPasteBaseBtn').addEventListener('click', () => {
+  document.getElementById('basePasteArea').style.display = 'none';
+  document.getElementById('basePasteActions').style.display = 'none';
+  document.getElementById('basePasteArea').value = '';
+});
+document.getElementById('confirmPasteBaseBtn').addEventListener('click', () => {
+  const text = document.getElementById('basePasteArea').value.trim();
+  if (!text) { toast('粘贴框为空', true); return; }
+  try {
+    parseBaseYaml(text, 'pasted-config.yaml');
+    document.getElementById('basePasteArea').style.display = 'none';
+    document.getElementById('basePasteActions').style.display = 'none';
+    document.getElementById('basePasteArea').value = '';
+  } catch (err) {
+    toast('解析失败: ' + err.message, true);
+  }
+});
+
+/* ============================================================
+ * MERGE STRATEGY PILLS
+ * ============================================================ */
+document.querySelectorAll('[data-strategy]').forEach(group => {
+  const key = group.dataset.strategy;
+  group.querySelectorAll('.strategy-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      group.querySelectorAll('.strategy-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      state.mergeStrategy[key] = pill.dataset.val;
+      generate();
+    });
+  });
+});
+
+/* ============================================================
+ * MAIN GENERATOR
+ * ============================================================ */
+function gatherInputs() {
+  // Aggregate all proxies from subs/paste/extras
+  const allProxies = [...state.fetchedProxies, ...state.pastedProxies];
+  state.extraProxies.forEach(raw => {
+    if (!raw.trim()) return;
+    try {
+      const t = raw.trim().startsWith('-') ? raw : '- ' + raw.split('\n').join('\n  ');
+      const parsed = jsyaml.load(t);
+      if (Array.isArray(parsed)) allProxies.push(...parsed);
+      else if (parsed) allProxies.push(parsed);
+    } catch (e) { /* skip bad */ }
+  });
+
+  // Dedup by name within new inputs
+  const seen = new Set();
+  const newProxies = allProxies.filter(p => {
+    if (!p || !p.name) return false;
+    if (seen.has(p.name)) return false;
+    seen.add(p.name);
+    return true;
+  });
+
+  // New rules: custom rules first, then enabled modules
+  const newRules = [];
+  state.customRules.forEach(r => {
+    if (r.value.trim()) newRules.push(`${r.type},${r.value.trim()},${r.action}`);
+  });
+  for (const [key, m] of Object.entries(MODULES)) {
+    if (!state.enabledModules.has(key)) continue;
+    newRules.push(`# ─── ${m.name} ───`);
+    m.rules.forEach(r => newRules.push(formatModuleRule(r, m.group)));
+  }
+
+  return { newProxies, newRules };
+}
+
+function generate() {
+  if (state.mode === 'edit' && state.baseConfig) {
+    return generateEditMode();
+  }
+  return generateCreateMode();
+}
+
+function generateCreateMode() {
+  const { newProxies, newRules } = gatherInputs();
+  const proxies = newProxies;
+  const proxyNames = proxies.map(p => p.name);
+
+  // Build proxy-groups
+  const groups = buildCoreProxyGroups(proxyNames);
+  groups.push(...buildEnabledPolicyGroups(proxyNames, {
+    primaryGroupName: 'Proxy',
+    hasAuto: true,
+    existingGroups: groups,
+  }));
+
+  const rules = [...newRules, 'MATCH,Proxy'];
+
+  const config = {
+    port: +document.getElementById('portHttp').value || 7890,
+    'socks-port': +document.getElementById('portSocks').value || 7891,
+    'mixed-port': +document.getElementById('portMixed').value || 7890,
+    'allow-lan': document.getElementById('optAllowLan').checked,
+    ipv6: document.getElementById('optIpv6').checked,
+    mode: document.getElementById('optMode').value,
+    'log-level': 'info',
+    'external-controller': '127.0.0.1:9090',
+  };
+
+  if (document.getElementById('optTun').checked) {
+    config.tun = {
+      enable: true, stack: 'system',
+      'auto-route': true, 'auto-detect-interface': true,
+      'dns-hijack': ['any:53'],
+    };
+  }
+  if (document.getElementById('optDns').checked) {
+    config.dns = {
+      enable: true, ipv6: false,
+      'enhanced-mode': 'fake-ip',
+      'fake-ip-range': '198.18.0.1/16',
+      'default-nameserver': ['223.5.5.5', '119.29.29.29'],
+      nameserver: ['https://dns.alidns.com/dns-query', 'https://doh.pub/dns-query'],
+      fallback: ['https://1.1.1.1/dns-query', 'https://8.8.8.8/dns-query'],
+    };
+  }
+
+  config.proxies = proxies;
+  config['proxy-groups'] = groups;
+
+  let yaml = jsyaml.dump(config, { lineWidth: 120, noRefs: true, sortKeys: false });
+  yaml += '\nrules:\n';
+  rules.forEach(r => {
+    if (r.startsWith('#')) yaml += `  ${r}\n`;
+    else yaml += `  - ${r}\n`;
+  });
+
+  const banner = `# ============================================================
+# Clash / Mihomo Configuration — CREATED FROM SCRATCH
+# Generated by Config Forge — ${new Date().toLocaleString('zh-CN')}
+# Proxies: ${proxies.length} · Rules: ${rules.filter(r => !r.startsWith('#')).length} · Modules: ${[...state.enabledModules].join(', ') || 'none'}
+# ============================================================
+
+`;
+
+  const final = banner + yaml;
+  renderOutput(final);
+  return final;
+}
+
+function generateEditMode() {
+  const { newProxies, newRules } = gatherInputs();
+  const base = JSON.parse(JSON.stringify(state.baseConfig));  // deep clone
+
+  /* --- Merge proxies --- */
+  const baseProxies = Array.isArray(base.proxies) ? base.proxies : [];
+  let finalProxies;
+  if (state.mergeStrategy.proxies === 'replace') {
+    finalProxies = newProxies;
+  } else if (state.mergeStrategy.proxies === 'keep') {
+    finalProxies = baseProxies;
+  } else {
+    // append: base + new, dedup by name (base wins on conflict)
+    const baseNames = new Set(baseProxies.map(p => p.name));
+    finalProxies = [...baseProxies, ...newProxies.filter(p => !baseNames.has(p.name))];
+  }
+
+  /* --- Merge proxy-groups --- */
+  const baseGroups = Array.isArray(base['proxy-groups']) ? base['proxy-groups'] : [];
+  const newProxyNames = newProxies.map(p => p.name).filter(n => !baseProxies.find(b => b.name === n));
+  let finalGroups;
+
+  if (state.mergeStrategy.groups === 'replace') {
+    // Build fresh groups from new proxies only
+    const allNames = finalProxies.map(p => p.name);
+    finalGroups = buildCoreProxyGroups(allNames);
+    finalGroups.push(...buildEnabledPolicyGroups(allNames, {
+      primaryGroupName: 'Proxy',
+      hasAuto: true,
+      existingGroups: finalGroups,
+    }));
+  } else if (state.mergeStrategy.groups === 'keep') {
+    finalGroups = baseGroups;
+  } else {
+    // merge: append new proxy names into existing groups that contain proxy lists
+    finalGroups = baseGroups.map(g => {
+      const cloned = { ...g };
+      if (Array.isArray(g.proxies) && newProxyNames.length) {
+        // Heuristic: if group already references many proxies (>2), append new ones
+        // Skip pure logic groups that only have DIRECT/REJECT/policy refs
+        const looksLikeProxyContainer = g.proxies.length === 0
+          || g.proxies.some(name => baseProxies.find(p => p.name === name));
+        if (looksLikeProxyContainer || g.type === 'url-test' || g.type === 'fallback' || g.type === 'load-balance') {
+          cloned.proxies = [...g.proxies, ...newProxyNames];
+        }
+      }
+      return cloned;
+    });
+
+    const allNames = finalProxies.map(p => p.name);
+    finalGroups.push(...buildEnabledPolicyGroups(allNames, {
+      primaryGroupName: findPrimaryPolicyGroup(finalGroups),
+      hasAuto: finalGroups.some(g => g.name === 'auto'),
+      existingGroups: finalGroups,
+    }));
+  }
+
+  /* --- Merge rules --- */
+  const baseRules = Array.isArray(base.rules) ? base.rules : [];
+  let finalRules;
+  if (state.mergeStrategy.rules === 'replace') {
+    finalRules = [...newRules, 'MATCH,Proxy'];
+  } else if (state.mergeStrategy.rules === 'append') {
+    // Insert before MATCH if it exists at the end
+    const tailMatchIdx = baseRules.findIndex((r, i) => i >= baseRules.length - 3 && /^MATCH,/i.test(r));
+    if (tailMatchIdx >= 0) {
+      finalRules = [...baseRules.slice(0, tailMatchIdx), ...newRules, ...baseRules.slice(tailMatchIdx)];
+    } else {
+      finalRules = [...baseRules, ...newRules];
+    }
+  } else {
+    // prepend: new rules first (highest priority)
+    finalRules = [...newRules, ...baseRules];
+  }
+
+  /* --- Build merged config (preserve all other base fields) --- */
+  const merged = { ...base };
+  merged.proxies = finalProxies;
+  merged['proxy-groups'] = finalGroups;
+  delete merged.rules;  // we'll write rules manually for comment preservation
+
+  let yaml = jsyaml.dump(merged, { lineWidth: 120, noRefs: true, sortKeys: false });
+  yaml += '\nrules:\n';
+  finalRules.forEach(r => {
+    if (typeof r !== 'string') r = String(r);
+    if (r.startsWith('#')) yaml += `  ${r}\n`;
+    else yaml += `  - ${r}\n`;
+  });
+
+  const newRuleCount = newRules.filter(r => !r.startsWith('#')).length;
+  const banner = `# ============================================================
+# Clash / Mihomo Configuration — EDITED
+# Base: ${state.baseFileName}
+# Generated by Config Forge — ${new Date().toLocaleString('zh-CN')}
+# Strategy: proxies=${state.mergeStrategy.proxies} · rules=${state.mergeStrategy.rules} · groups=${state.mergeStrategy.groups}
+# +${newProxyNames.length} proxies · +${newRuleCount} rules · Total: ${finalProxies.length} proxies / ${finalRules.filter(r => typeof r === 'string' && !r.startsWith('#')).length} rules
+# ============================================================
+
+`;
+
+  const final = banner + yaml;
+  renderOutput(final);
+  return final;
+}
+
+/* ============================================================
+ * OUTPUT RENDERING (with naive syntax highlighting)
+ * ============================================================ */
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function renderOutput(text) {
+  const lines = text.split('\n');
+  const html = lines.map(line => {
+    if (/^\s*#/.test(line)) return `<span class="yc">${escapeHtml(line)}</span>`;
+    // key: value
+    const m = line.match(/^(\s*-?\s*)([\w-]+)(\s*:\s*)(.*)$/);
+    if (m) {
+      const [, indent, key, sep, val] = m;
+      const valHtml = val.match(/^(true|false|null)$/)
+        ? `<span class="yn">${escapeHtml(val)}</span>`
+        : val.match(/^\d+(\.\d+)?$/)
+          ? `<span class="yn">${escapeHtml(val)}</span>`
+          : val
+            ? `<span class="ys">${escapeHtml(val)}</span>`
+            : '';
+      return `${escapeHtml(indent)}<span class="yk">${escapeHtml(key)}</span><span class="yp">${escapeHtml(sep)}</span>${valHtml}`;
+    }
+    return escapeHtml(line);
+  }).join('\n');
+  document.getElementById('output').innerHTML = html;
+  document.getElementById('lineCount').textContent = `${lines.length} 行`;
+}
+
+/* ============================================================
+ * STATUS / TOAST
+ * ============================================================ */
+function setStatus(text, kind) {
+  const el = document.getElementById('outputStatus');
+  el.className = 'output-status' + (kind === 'ready' ? ' ready' : kind === 'error' ? ' error' : '');
+  document.getElementById('statusText').textContent = text;
+}
+function toast(msg, isError) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => el.className = 'toast' + (isError ? ' error' : ''), 3500);
+}
+
+/* ============================================================
+ * COPY / DOWNLOAD
+ * ============================================================ */
+document.getElementById('copyBtn').addEventListener('click', () => {
+  const text = generate();
+  navigator.clipboard.writeText(text).then(
+    () => toast('已复制到剪贴板'),
+    () => toast('复制失败', true)
+  );
+});
+
+document.getElementById('downloadBtn').addEventListener('click', () => {
+  const text = generate();
+  const blob = new Blob([text], { type: 'text/yaml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `clash-config-${Date.now()}.yaml`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  toast('下载已开始');
+});
+
+/* ============================================================
+ * OPTION ROW VISUAL TOGGLE
+ * ============================================================ */
+document.querySelectorAll('.opt-row').forEach(row => {
+  const cb = row.querySelector('input');
+  const sync = () => row.classList.toggle('checked', cb.checked);
+  cb.addEventListener('change', () => { sync(); generate(); });
+  sync();
+});
+
+document.querySelectorAll('#portHttp, #portSocks, #portMixed, #optMode').forEach(el => {
+  el.addEventListener('input', generate);
+  el.addEventListener('change', generate);
+});
+
+/* ============================================================
+ * CLOCK
+ * ============================================================ */
+function tick() {
+  const d = new Date();
+  document.getElementById('time').textContent =
+    `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+}
+tick(); setInterval(tick, 1000);
+
+/* ============================================================
+ * MOBILE TAB SWITCHING
+ * ============================================================ */
+function setupMobileTabs() {
+  const main = document.getElementById('mainContent');
+  const isMobile = window.matchMedia('(max-width: 900px)').matches;
+  if (isMobile) {
+    main.classList.add('mobile-tabbed');
+  } else {
+    main.classList.remove('mobile-tabbed');
+    // Show both columns on desktop
+    document.querySelectorAll('main > .col').forEach(c => c.classList.add('active-tab'));
+  }
+}
+setupMobileTabs();
+window.addEventListener('resize', setupMobileTabs);
+
+document.querySelectorAll('.mobile-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const target = tab.dataset.tab;
+    document.querySelectorAll('.mobile-tab').forEach(t => t.classList.toggle('active', t === tab));
+    document.querySelectorAll('main > .col').forEach(c => {
+      c.classList.toggle('active-tab', c.dataset.tab === target);
+    });
+    // Scroll to top when switching
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+});
+
+/* ============================================================
+ * INIT
+ * ============================================================ */
+renderRuleTemplates();
+renderModules();
+renderCustomRules();
+renderExtraProxies();
+generate();
+</script>
+</body>
+</html>
